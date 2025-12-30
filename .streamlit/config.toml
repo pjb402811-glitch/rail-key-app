@@ -1,0 +1,14 @@
+[global]
+developmentMode = false
+
+[theme]
+base = "light"
+# primaryColor = "#f63366"
+# backgroundColor = "#ffffff"
+# secondaryBackgroundColor = "#f0f2f6"
+# textColor = "#31333f"
+font = "Source Sans Pro"
+
+[server]
+port = 8555
+enableCORS = true

@@ -1,0 +1,14 @@
+streamlit
+pandas
+numpy
+openpyxl
+PyInstaller
+altair
+python-dateutil
+vl-convert-python
+weasyprint
+scipy
+matplotlib
+pyarrow
+pydeck
+watchdog
