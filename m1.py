@@ -4,6 +4,13 @@ import pandas as pd
 import os
 import streamlit as st
 
+# --- [복구된 함수] 이 함수가 없어서 에러가 났습니다! ---
+def resource_path(relative_path):
+    """
+    Streamlit Cloud 환경에서는 단순히 상대 경로를 반환하면 됩니다.
+    """
+    return relative_path
+
 class DataManager:
 
     KPI_ABBREVIATIONS = {
@@ -24,9 +31,6 @@ class DataManager:
     ABBREVIATIONS_TO_FULL_NAMES = {v: k for k, v in KPI_ABBREVIATIONS.items()}
 
     def __init__(self):
-        # --- [수정된 부분] 복잡한 경로 함수 제거하고 단순화 ---
-        # 리눅스 서버에서는 그냥 "폴더명/파일명"으로 쓰면 알아서 찾습니다.
-        
         # 1. 원본 파일 경로
         self.original_policy_path = "data/policy_db.csv"
         self.original_coeffs_path = "data/coefficients.csv"
@@ -35,14 +39,13 @@ class DataManager:
         self.modified_policy_path = "data/policy_db_modified.csv"
         self.modified_coeffs_path = "data/coefficients_modified.csv"
 
-        # data 폴더가 혹시 없으면 에러가 나므로 확인
+        # data 폴더가 혹시 없으면 생성
         if not os.path.exists('data'):
             os.makedirs('data')
 
     def _load_csv_with_encoding_fallback(self, filepath):
-        """인코딩 폴백을 사용하여 CSV(쉼표 구분) 파일을 로드합니다."""
         if not os.path.exists(filepath):
-            return None # 파일이 없으면 None 반환
+            return None 
 
         try:
             df = pd.read_csv(filepath, encoding='utf-8')
@@ -51,7 +54,6 @@ class DataManager:
         return df
 
     def _load_tsv_with_encoding_fallback(self, filepath):
-        """인코딩 폴백을 사용하여 TSV(탭 구분) 파일을 로드합니다."""
         if not os.path.exists(filepath):
             return None
 
@@ -62,20 +64,14 @@ class DataManager:
         return df
 
     def load_policy_data(self):
-        """
-        추진 과제(정책) 리스트를 로드합니다.
-        """
-        # 1. 수정된 파일이 있는지 먼저 확인
         if os.path.exists(self.modified_policy_path):
             df = self._load_csv_with_encoding_fallback(self.modified_policy_path)
         else:
-            # 2. 없으면 원본 로드
             df = self._load_csv_with_encoding_fallback(self.original_policy_path)
         
-        # 만약 원본도 못 찾으면 에러 방지를 위해 빈 데이터프레임 생성
         if df is None:
-            st.error(f"🚨 데이터 파일을 찾을 수 없습니다: {self.original_policy_path}")
-            return pd.DataFrame()
+            # 파일이 없어도 앱이 죽지 않도록 빈 데이터프레임 반환
+            return pd.DataFrame(columns=['category', 'name', 'cost', 'process', 'duration_months', 'related_kpi'])
 
         df['duration_months'] = df['duration_months'].astype(str).str.replace('개월', '')
         df['duration_months'] = pd.to_numeric(df['duration_months'], errors='coerce').fillna(0).astype(int)
@@ -85,24 +81,21 @@ class DataManager:
         df.to_csv(self.modified_policy_path, index=False, encoding='utf-8')
 
     def load_coefficients_df(self):
-        """ 계수 파일을 로드합니다. """
         if os.path.exists(self.modified_coeffs_path):
             df = self._load_tsv_with_encoding_fallback(self.modified_coeffs_path)
         else:
             df = self._load_tsv_with_encoding_fallback(self.original_coeffs_path)
         
         if df is None:
-            st.error(f"🚨 계수 파일을 찾을 수 없습니다: {self.original_coeffs_path}")
-            return pd.DataFrame() # 빈 껍데기 반환
+            return pd.DataFrame() 
 
         return df
 
     def load_coefficients(self):
-        """ 만족도 모형 계수 로드 및 변환 """
         df = self.load_coefficients_df()
         
         if df.empty:
-            return {}, {}, {} # 파일 없으면 빈 딕셔너리 반환
+            return {}, {}, {}
 
         if 'model_type' not in df.columns:
             df['model_type'] = 'A'
@@ -158,51 +151,26 @@ class DataManager:
                 params_dict[param2_name] = float(param2_value)
 
         # 하드코딩된 PAI 가중치 (백업용)
-        pai_coeffs['weights'] = {
-            '고속철도': {'도보': 10.28, '택시': 26.64, '승용차': 20.56, '자전거': 0.47, '공유PM': 0.47, '마을/시내버스': 18.22, '광역버스': 4.21, '지하철/광역철도': 19.16},
-            '일반철도': {'도보': 5.97, '택시': 30.59, '승용차': 23.13, '자전거': 2.24, '공유PM': 1.49, '마을/시내버스': 27.61, '광역버스': 5.22, '지하철/광역철도': 3.73},
-            '광역철도': {'도보': 39.06, '택시': 9.67, '승용차': 6.81, '자전거': 5.38, '공유PM': 3.58, '마을/시내버스': 23.66, '광역버스': 3.58, '지하철/광역철도': 8.24}
-        }
-        pai_coeffs['alpha'] = {'고속철도': 1.0, '일반철도': 1.0, '광역철도': 1.0}
+        if not pai_coeffs['weights']:
+             pai_coeffs['weights'] = {
+                '고속철도': {'도보': 10.28, '택시': 26.64, '승용차': 20.56, '자전거': 0.47, '공유PM': 0.47, '마을/시내버스': 18.22, '광역버스': 4.21, '지하철/광역철도': 19.16},
+                '일반철도': {'도보': 5.97, '택시': 30.59, '승용차': 23.13, '자전거': 2.24, '공유PM': 1.49, '마을/시내버스': 27.61, '광역버스': 5.22, '지하철/광역철도': 3.73},
+                '광역철도': {'도보': 39.06, '택시': 9.67, '승용차': 6.81, '자전거': 5.38, '공유PM': 3.58, '마을/시내버스': 23.66, '광역버스': 3.58, '지하철/광역철도': 8.24}
+            }
+        if not pai_coeffs['alpha']:
+            pai_coeffs['alpha'] = {'고속철도': 1.0, '일반철도': 1.0, '광역철도': 1.0}
                 
         return coeffs, pai_coeffs, tci_coeffs
         
     def save_coefficients(self, df):
         df.to_csv(self.modified_coeffs_path, index=False, encoding='utf-8')
 
-    def restore_policy_data(self):
-        try:
-            if os.path.exists(self.modified_policy_path):
-                os.remove(self.modified_policy_path)
-                st.toast("✅ 추진 과제 데이터가 초기 상태로 복원되었습니다.")
-            else:
-                st.toast("ℹ️ 이미 초기 상태입니다.")
-        except Exception as e:
-            st.error(f"🚨 복원 오류: {e}")
-
-    def restore_coefficients_data(self):
-        try:
-            if os.path.exists(self.modified_coeffs_path):
-                os.remove(self.modified_coeffs_path)
-                st.toast("✅ 만족도 계수 데이터가 초기 상태로 복원되었습니다.")
-            else:
-                st.toast("ℹ️ 이미 초기 상태입니다.")
-        except Exception as e:
-            st.error(f"🚨 복원 오류: {e}")
-
     def restore_all_data(self):
         try:
-            files_removed = False
             if os.path.exists(self.modified_policy_path):
                 os.remove(self.modified_policy_path)
-                files_removed = True
             if os.path.exists(self.modified_coeffs_path):
                 os.remove(self.modified_coeffs_path)
-                files_removed = True
-            
-            if files_removed:
-                st.toast("✅ 모든 데이터가 초기 상태로 복원되었습니다.")
-            else:
-                st.toast("ℹ️ 이미 모든 데이터가 초기 상태입니다.")
+            st.toast("✅ 모든 데이터가 초기 상태로 복원되었습니다.")
         except Exception as e:
             st.error(f"🚨 복원 오류: {e}")
