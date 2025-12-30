@@ -10,5 +10,5 @@ base = "light"
 font = "Source Sans Pro"
 
 [server]
-port = 8555
+port = 8501
 enableCORS = true
